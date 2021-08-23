@@ -431,7 +431,6 @@ void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
     cout << "This is the time it took for this batch: " << duration.count() << "\n";
 
     correct += printClassifierResults(reads, result);
-    //iter = result.erase(result.begin(), result.begin() + reads.size());
     reads.clear();
 
     cout<<"Accuracy: "<<correct*1.0/total<<"\n";

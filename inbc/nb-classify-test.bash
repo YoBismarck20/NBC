@@ -12,7 +12,7 @@
 NTHREADS=16
 EXEC_ROOT=/ifs/groups/rosenMRIGrp/wc492/timingStuff/Lastne/NBC_GNU_Parallel/NB.run
 #EXEC_ROOT=/ifs/groups/rosenMRIGrp/wc492/timingStuff/Lastne/c++/NB.run
-GEN_SRC=/ifs/groups/rosenMRIGrp/wc492/timingStuff/Lastne/c++/read2
+GEN_SRC=/ifs/groups/rosenMRIGrp/wc492/timingStuff/Lastne/NBC_GNU_Parallel/read2/
 #GEN_SRC=/ifs/groups/rosenMRIGrp/wc492/timingStuff/Lastne/lustre/scratch/zz374/nbc_paper_data/ncbi_reads_noerr/fold1/
 MODEL=/ifs/groups/rosenMRIGrp/wc492/timingStuff/Lastne/c++/inbc/NB_save/
 #MODEL=1
