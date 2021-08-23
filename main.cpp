@@ -217,6 +217,46 @@ int printClassifierResults(vector<Read*> reads,
 void processReadData(Read* read, int i) {
     read->processData(i);
 }
+
+vector<Read*> processJellyfish(){
+	std::system("parallel -k -j 16 < outputv2 > finalOutput");
+	char buf[1234];
+	FILE* fp = fopen("finalOutput","r");
+	int sizeOfTemp = 0;
+	int debugOnlyReadCount = 0; 
+	string finalString = "standby";
+    	string s = "standby2";
+	int val = 0;
+	unordered_map<int, int> *kmer_counts;
+    	kmer_counts = new unordered_map<int, int>;
+	vector<Read*> reads;
+	int key = 0;
+	while (fgets(buf,sizeof(buf),fp) != NULL ) {
+		if(*buf =='>') {
+			string str(buf);
+			string sval = str.substr(1);
+			cout <<  "Integer: "<<sval<<"\n";
+			val=stoi(sval);
+		} else if (*buf == '#') {
+			Read *read= new Read(finalString,s);
+			cout << "Before getting Kmer counts from current map" << "\n";
+			read->obtainKmerCountsByInput(*kmer_counts);
+			cout << "After getting counts"  << "\n";
+			kmer_counts = new unordered_map<int,int>;
+			cout << "end of a Read" << "\n" ;
+			reads.push_back(read);
+			debugOnlyReadCount += 1;
+			cout <<"Number of reads read in: "<< debugOnlyReadCount << "\n";
+
+		} else {
+			cout << buf << "\n";
+			 key=getMapKey(buf);
+			(*kmer_counts)[key]=val;
+		}
+	}
+	fclose(fp);
+
+}
 void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
                 uint64_t memoryLimit, unsigned int nthread) {
     vector<Read*> reads;
@@ -347,7 +387,7 @@ void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
         			}
     			}
 			fclose(fp);
-                        //exit(0);
+                        exit(0);
                         cout << "Starting batch processing" << "\n";
                         //standby.clear();
                         //standby.push_back(read);
