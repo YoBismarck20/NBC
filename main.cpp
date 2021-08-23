@@ -239,27 +239,31 @@ void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
         Diskutil::getTrainingGenomePaths(srcdir, extension);
     vector<Read*> standby;
     vector<thread*> processor(nthread);
+    int debugOnlyReadCount = 0;
 
-    std::ofstream out("outputv2");
+    std::ofstream out2;
+    out2.open("outputv2",ios::out|ios::trunc);
+    int fileIterator=0;
+    // for each file in the directory
     for(vector<tuple<string, path, path> >::iterator iter =
                 result.begin(); iter != result.end(); iter++, counter++) {
+	
         auto start2 = std::chrono::high_resolution_clock::now();
 
         filename=get<2>(*iter).string();
         cout << filename << "\n";
         std::fstream newFile;
         newFile.open(filename, ios::in);
-        //delete this ASAP
         if(newFile.is_open()) {
-            printf("File is Open\n");
             string s;
             string header;
             string line;
             string finalString;
             int iterator;
             iterator=0;
-
+	    //while there is still lines in the file
             while(getline(newFile,line)) {
+
                 if (line.at(0) =='>' && s.empty()) {
 
                     header=line;
@@ -277,7 +281,7 @@ void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
                     cout << "This is the final string" << "\n";
                     cout << finalString << "\n";
                     //Test Code; remove ASAP
-
+		    /*
                     if(memoryLimit != 0 && usedMemory > memoryLimit) {
 
                         auto start = std::chrono::high_resolution_clock::now();
@@ -295,52 +299,73 @@ void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
                         reads.clear();
                         auto start2 = std::chrono::high_resolution_clock::now();
 
-                    }
-                    //Going to try to batch the read and then push back onlt after if it reaches the max amunt of threads
-                    //
+                    }*/
+		    bool isItValid = sizeOfTemp < 1000;
+		    cout << "This is size Of Temp "<<sizeOfTemp<<" and this is if it will enter the if loop "<<isItValid<<"\n";
+		    cout << "This is the size of the file iterator " << fileIterator;
                     if(sizeOfTemp < 10000) {
-                        // No matter how much things there is, it will always be in the file...
-                        //standby.push_back(read);
+			// if there is enough reads in the file, 
                         sizeOfTemp += 1;
-                        cout << "Size of tempFile" << sizeOfTemp << "\n";
+                        cout << "Size of tempFile " << sizeOfTemp << "\n";
                         string target = "echo -e \'" + finalString+"\' | ./jellyfish-linux count -m 15 -s 10M /dev/stdin -o /dev/stdout | ./jellyfish-linux dump /dev/stdin";
-                        out<< target << "\n";
-                        out << "echo \"#\"\n";
-                        out << "echo @" + filename + "\n";
-                        //out << "echo $" <<  "\n";
+                        out2 << target << "\n";
+                        out2 << "echo \"#\" \n";
                     }
                     else {
                         //remove this afer finishing getting the strings
                         //This is the part where it doesnt do it for all....
-                        out.close();
-                        fp = popen("parallel -k -j 16 < outputv2","r");
+                        //out.close();
+                        //fp = popen("parallel -k -j 16 < outputv2","r");
+			//
+			out2.close();
+			std::system("parallel -k -j 16 < outputv2 > finalOutput");
+			fp = fopen("finalOutput","r");
                         sizeOfTemp = 0;
-                        while (fgets(buf,sizeof(buf),fp)) {
-                            if(*buf =='>') {
-                                string str(buf);
-                                string sval = str.substr(1);
-                                cout <<  "Integer: "<<sval<<"\n";
-                                val=stoi(sval);
-                            } else if (*buf == '#') {
-                                Read *read= new Read(finalString,s);
-                                cout << "Before getting Kmer counts from current map" << "\n";
-                                read->obtainKmerCountsByInput(*kmer_counts);
-                                cout << "After getting counts"  << "\n";
-                                kmer_counts = new unordered_map<int,int>;
-                                cout << "end of a Read" << "\n" ;
-                                reads.push_back(read);
-                                usedMemory += read->countMapSize();
-                            } else {
-                                cout << buf << "\n";
-                                key=getMapKey(buf);
-                                (*kmer_counts)[key]=val;
-                            }
-                        }
+			debugOnlyReadCount = 0; 
+			while (fgets(buf,sizeof(buf),fp) != NULL ) {
+        			if(*buf =='>') {
+            				string str(buf);
+            				string sval = str.substr(1);
+            				cout <<  "Integer: "<<sval<<"\n";
+            				val=stoi(sval);
+        			} else if (*buf == '#') {
+            				Read *read= new Read(finalString,s);
+            				cout << "Before getting Kmer counts from current map" << "\n";
+            				read->obtainKmerCountsByInput(*kmer_counts);
+            				cout << "After getting counts"  << "\n";
+            				kmer_counts = new unordered_map<int,int>;
+            				cout << "end of a Read" << "\n" ;
+            				reads.push_back(read);
+            				debugOnlyReadCount += 1;
+            				cout <<"Number of reads read in: "<< debugOnlyReadCount << "\n";
+            				usedMemory += read->countMapSize();
+
+        			} else {
+            				cout << buf << "\n";
+           				 key=getMapKey(buf);
+            				(*kmer_counts)[key]=val;
+        			}
+    			}
+			fclose(fp);
                         //exit(0);
                         cout << "Starting batch processing" << "\n";
                         //standby.clear();
                         //standby.push_back(read);
-                        sizeOfTemp = 0;
+			nb.classify(reads);
+			correct += printClassifierResults(reads, result);
+			iter = result.erase(result.begin(), result.begin() + reads.size());
+			reads.clear();
+			//out2.clear();
+			//out2.flush();
+			out2.open("outputv2",ios::out|ios::trunc);
+			string target = "echo -e \'" + finalString+"\' | ./jellyfish-linux count -m 15 -s 10M /dev/stdin -o /dev/stdout | ./jellyfish-linux dump /dev/stdin";
+			out2 << target << "\n";
+    			out2 << "echo \"#\" \n";
+
+			//out("outputv2",std::ios_base::out);
+		//	std::ofstream out("outputv2");
+
+
                     }
 //  	  reads.push_back(read);
 //	  usedMemory += stringMemory2;
@@ -352,12 +377,18 @@ void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
                 }
             }
             newFile.close();
+	    fileIterator+=1;
         }
     }
+    //One last push of data
+    
+    out2.close();
     string finalString = "standby";
     string s = "standby2";
-    int debugOnlyReadCount = 0;
-    fp = popen("parallel -k -j 16 < outputv2","r");
+    //fp = popen("parallel -k -j 16 < outputv2","r");
+    std::system("parallel -k -j 16 < outputv2 > finalOutput");
+    fp = fopen("finalOutput","r");
+    debugOnlyReadCount = 0; 
     while (fgets(buf,sizeof(buf),fp) != NULL ) {
         if(*buf =='>') {
             string str(buf);
@@ -383,8 +414,6 @@ void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
             cout << buf << "\n";
         } else if (*buf == '$') {
             cout << "This is debugging" <<"\n";
-
-
         } else {
             cout << buf << "\n";
             key=getMapKey(buf);
@@ -392,7 +421,7 @@ void classifyNB(NB &nb, path srcdir, string extension, unsigned int nbatch,
         }
     }
     int error;
-    error = pclose(fp);
+    error = fclose(fp);
     cout << "This is the potential error "<< error << "\n";
     cout <<"Size of reads: " << reads.size() << "\n";
     auto start = std::chrono::high_resolution_clock::now();
@@ -497,12 +526,6 @@ flag increases the classifier's memory usage and is not compatible with the memo
         cout<<"Classify mode.\n";
 
         classifyNB(nb, path(srcdir), kmer_ext, nbatch, memLimit, nthreads);
-
-    } else if(mode.compare("benchmark") == 0) {
-        trainNB(nb, path(srcdir), kmer_ext, nbatch, memLimit);
-
-        classifyNB(nb, path(srcdir+"_test"), kmer_ext, nbatch, memLimit,nthreads);
-    } else {
         cout<<usageMsg<<"\n"<<generic<<"\n"<<visible<<"\n";
         return 1;
     }
